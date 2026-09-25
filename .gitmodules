@@ -1,15 +1,15 @@
-[submodule "gateway"]
-	path = gateway
-	url = https://github.com/pedro-solutis/helpdesk-api-gateway.git
-[submodule "ticket"]
-	path = ticket
-	url = https://github.com/pedro-solutis/helpdesk-api-ticket-service.git
 [submodule "frontend"]
 	path = frontend
 	url = https://github.com/pedro-solutis/helpdesk-frontend.git
-[submodule "user"]
-	path = user
-	url = https://github.com/pedro-solutis/helpdesk-api-user-service.git
-[submodule "notification"]
-	path = notification
+[submodule "backend/gateway"]
+	path = backend/gateway
+	url = https://github.com/pedro-solutis/helpdesk-api-gateway.git
+[submodule "backend/notification"]
+	path = backend/notification
 	url = https://github.com/pedro-solutis/helpdesk-api-notification-service.git
+[submodule "backend/ticket"]
+	path = backend/ticket
+	url = https://github.com/pedro-solutis/helpdesk-api-ticket-service.git
+[submodule "backend/user"]
+	path = backend/user
+	url = https://github.com/pedro-solutis/helpdesk-api-user-service.git
