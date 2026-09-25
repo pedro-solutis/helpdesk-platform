@@ -49,15 +49,15 @@ docker compose up -d --build
 *(Na primeira vez que for executado, o Docker fará o download das imagens do PostgreSQL e RabbitMQ, além de realizar o build (compilação) de cada aplicação Spring e do React, o que pode levar alguns minutos).*
 
 4. Acessos aos serviços em execução:
-- **Frontend (Interface do Usuário):** http://localhost (ou http://localhost:80 caso tenha adicionado ao compose)
+- **Frontend (Interface do Usuário):** http://localhost
 - **API Gateway (Rotas REST base):** http://localhost:8080
-- **RabbitMQ Dashboard:** http://localhost:15672 (Usuário: `guest` / Senha: `guest`)
+- **RabbitMQ Dashboard:** http://localhost:15672
 - **Documentação Swagger:** http://localhost:8080/swagger-ui.html
 
 ## Principais Endpoints (via API Gateway - Porta 8080)
 
 **Usuários e Autenticação (`/api/users`)**
-- `POST /api/users/auth/login` - Autentica usuário e retorna JWT.
+- `POST /api/login` - Autentica usuário e retorna JWT.
 - `POST /api/users` - Criação de novo usuário.
 - `GET /api/users` - Lista de usuários filtrada por parâmetros.
 
@@ -65,17 +65,19 @@ docker compose up -d --build
 - `POST /api/tickets` - Cria um novo chamado no status `OPEN`.
 - `GET /api/tickets` - Busca e listagem de chamados com filtros (categoria, status, cliente, prioridade).
 - `GET /api/tickets/{id}` - Visualização dos detalhes do chamado.
-- `PUT /api/tickets/{id}/status` - Atualização do status do chamado (ex: para `IN_PROGRESS` ou `RESOLVED`).
-- `PATCH /api/tickets/{id}/assign` - Atribui um técnico a um chamado específico.
+- `GET /api/ticket/dashboard` - Consultar metricas de ticket do usuário ou geral.
+- `PUT /api/tickets/{id}` - Atualização do status do chamado (ex: para `IN_PROGRESS` ou `RESOLVED`).
+- `PATCH /api/tickets/technician/{id}` - Atribui um técnico a um chamado específico.
+- `PATCH /api/ticket/{id}` - Alterar o status do chamado para `CLOSED`.
 
 **Notificações (`/api/notifications`)**
-- `GET /api/notifications` - Traz a lista de notificações pertinentes ao usuário logado.
+- `GET /api/notifications?recipientId={recipientId}` - Traz a lista de notificações pertinentes ao usuário logado.
 
 ## Eventos RabbitMQ (Mensageria)
 O sistema aplica estratégias baseadas a eventos para processos de notificação:
-- **Eventos Principais:** `TicketCreated` e `TicketAssigned`.
+- **Eventos Principais:** `TicketCreated`, `TicketAssigned` e `TicketStatusChanged`.
 - **Como funciona:** Imediatamente após confirmar a transação do banco de dados na criação ou delegação de um chamado, o `ticket-service` dispara uma notificação (mensagem) para a fila do RabbitMQ. 
-- O `notification-service`, que atua como um `listener`, consome a mensagem de forma reativa e persiste as notificações no banco dele para visualização futura do cliente ou técnico, sem atrasar a resposta da API (Non-blocking).
+O `notification-service`, que atua como um `listener`, consome a mensagem de forma reativa e persiste as notificações no banco dele para visualização futura do cliente ou técnico, sem atrasar a resposta da API (Non-blocking).
 
 ## Estratégia de Persistência
 Cada microsserviço é autônomo e isolado em relação aos seus dados, garantindo a ausência de acoplamento rígido de bancos de dados.
