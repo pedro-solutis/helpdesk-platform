@@ -1,0 +1,139 @@
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rootpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./init-multiple-databases.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-root} -d ${POSTGRES_DB:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    build:
+      context: ../backend/gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - USER_SERVICE_URI=${USER_SERVICE_URI:-http://user-service:8081}
+      - TICKET_SERVICE_URI=${TICKET_SERVICE_URI:-http://ticket-service:8082}
+      - NOTIFICATION_SERVICE_URI=${NOTIFICATION_SERVICE_URI:-http://notification-service:8083}
+    depends_on:
+      - user-service
+      - ticket-service
+      - notification-service
+
+  user-service:
+    build:
+      context: ../backend/user
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB_USER_SERVICE:-jdbc:postgresql://postgres:5432/user_db}
+      - POSTGRES_USER=${POSTGRES_USER:-root}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-rootpassword}
+      - DATASOURCE_DRIVER=${DATASOURCE_DRIVER:-org.postgresql.Driver}
+      - JWT_SECRET=${JWT_SECRET:-mySuperSecretKey123!}
+      - JWT_ISSUER=${JWT_ISSUER:-user-service}
+      - GATEWAY_URL=${GATEWAY_URL:-http://localhost:8080/api}
+      - LOCAL_URL=${USER_SERVICE_LOCAL_URL:-http://localhost:8081}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin@admin.com.br}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ticket-service:
+    build:
+      context: ../backend/ticket
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - DATASOURCE_NAME=${DATASOURCE_NAME_TICKET_DB:-jdbc:postgresql://postgres:5432/ticket_db}
+      - DATASOURCE_USERNAME=${POSTGRES_USER:-root}
+      - DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-rootpassword}
+      - DATASOURCE_DRIVER=${DATASOURCE_DRIVER:-org.postgresql.Driver}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-rabbitmq}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_USERNAME=${RABBITMQ_USER:-guest}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
+      - RABBIT_EXCHANGE=${RABBITMQ_EXCHANGE:-ticket.exchange}
+      - JWT_SECRET=${JWT_SECRET:-mySuperSecretKey123!}
+      - JWT_ISSUER=${JWT_ISSUER:-user-service}
+      - GATEWAY_URL=${GATEWAY_URL:-http://localhost:8080/api}
+      - LOCAL_URL=${TICKET_SERVICE_LOCAL_URL:-http://localhost:8082}
+      - USER_SERVICE_URL=${USER_SERVICE_URL:-http://user-service:8081}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: ../backend/notification
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      - DATASOURCE_NAME=${DATASOURCE_NAME_NOTIFICATION_DB:-jdbc:postgresql://postgres:5432/notification_db}
+      - DATASOURCE_USERNAME=${POSTGRES_USER:-root}
+      - DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:-rootpassword}
+      - DATASOURCE_DRIVER=${DATASOURCE_DRIVER:-org.postgresql.Driver}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-rabbitmq}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_USERNAME=${RABBITMQ_USER:-guest}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
+      - RABBIT_EXCHANGE=${RABBITMQ_EXCHANGE:-ticket.exchange}
+      - RABBIT_NOTIFICATION_QUEUE=${RABBITMQ_NOTIFICATION_QUEUE:-notification.queue}
+      - RABBIT_ROUTING_KEY=${RABBITMQ_ROUTING_KEY:-ticket.#}
+      - JWT_SECRET=${JWT_SECRET:-mySuperSecretKey123!}
+      - JWT_ISSUER=${JWT_ISSUER:-user-service}
+      - GATEWAY_URL=${GATEWAY_URL:-http://localhost:8080/api}
+      - LOCAL_URL=${NOTIFICATION_SERVICE_LOCAL_URL:-http://localhost:8083}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_BASE_URL=${GATEWAY_URL:-http://localhost:8080/api}
+    ports:
+      - "80:80"
+    environment:
+      - VITE_BASE_URL=${GATEWAY_URL:-http://localhost:8080/api}
+    depends_on:
+      - gateway
+
+volumes:
+  postgres_data:
+
